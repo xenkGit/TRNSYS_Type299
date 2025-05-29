@@ -1,0 +1,1 @@
+These DLLs were compiled for TRNSYS 18.06 (64 bit) using the v142 toolset and C++20 standard.

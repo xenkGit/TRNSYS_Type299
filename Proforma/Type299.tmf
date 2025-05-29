@@ -1,0 +1,593 @@
+#ESI!
+4.0
+Borehole heat exchanger field
+0
+
+Xenia Kirschstein
+TU Darmstadt, Institute of Structural Mechanics and Design
+1
+
+2
+24
+November 29, 2024
+
+May 21, 2025
+1
+
+noowner
+__
+__
+__
+1
+This model represents a double U-tube borehole heat exchanger field with irregular geometry, coupling a short-term thermal resistance and capacitance model and a combination of g-functions. The coordinates of the boreholes should be specified in a file called "coordinates.txt" and placed in the same folder as the dck-file. By default, the g-function is calculated internally. Alternatively, a g-function can be provided in a file called "pygfunction_gFunc.txt" and placed in the same folder as the dck-file (in this case make sure to use the same time settings in pygfunction and cells_per_level=5). The vertical and horizontal discretisation can be set using "Number of segments" and "Number of sheath grout nodes". Please refer to the documentation for the model limitations.
+0
+0
+0
+0
+0
+0
+__
+__
+__
+1
+
+0
+__
+__
+__
+__
+0
+0
+__
+
+__
+__
+__
+27
+Inlet fluid temperature
+SN
+1
+
+simple
+real
+1
++
+-273.15
++6000
+[ ; ]
+10
+0
+C
+Temperature
+Inlet mass flow rate (total)
+SN
+1
+
+simple
+real
+1
++
+0
++Inf
+[ ; ]
+0
+0
+kg/hr
+Flow Rate
+Number of U-tubes per borehole
+SN
+1
+Currently only 2 are allowed
+simple
+integer
+3
++
+1
+2
+[ ; ]
+2
+0
+-
+Dimensionless
+Length of one borehole
+SN
+1
+
+simple
+real
+3
++
+10
++Inf
+[ ; ]
+100
+0
+m
+Length
+Borehole radius
+SN
+1
+
+simple
+real
+3
++
+0
++Inf
+] ; [
+0.076
+0
+m
+Length
+Tube radius
+SN
+1
+Outer radius of one tube
+simple
+real
+3
++
+0
++Inf
+] ; [
+0.016
+0
+m
+Length
+TC tube
+SN
+1
+Thermal conductivity of the tube material
+simple
+real
+3
++
+0
++Inf
+] ; [
+1.44
+0
+kJ/hr.m.K
+Thermal Conductivity
+Tube wall thickness
+SN
+1
+Thickness of the pipe material of a U-tube
+simple
+real
+3
++
+0
++Inf
+] ; [
+0.003
+0
+m
+Length
+Shank spacing
+SN
+1
+Caution! Defined here as the distance from the centre of one U-tube to the centre of the borehole
+simple
+real
+3
++
+0
++Inf
+] ; [
+0.052
+0
+m
+Length
+TC ground
+SN
+1
+Thermal conductivity of the homogeneous ground
+simple
+real
+3
++
+0
++Inf
+] ; [
+10.8
+0
+kJ/hr.m.K
+Thermal Conductivity
+Density ground
+SN
+1
+Density of the homogeneous ground layer
+simple
+real
+3
++
+0
++Inf
+] ; [
+1800
+0
+kg/m^3
+Density
+cp ground
+SN
+1
+Specific heat capacity of the homogeneous ground layer
+simple
+real
+3
++
+0
++Inf
+] ; [
+0.861
+0
+kJ/kg.K
+Specific Heat
+TC filling
+SN
+1
+Thermal conductivity of the grout material
+simple
+real
+3
++
+0
++Inf
+] ; [
+7.2
+0
+kJ/hr.m.K
+Thermal Conductivity
+Density filling
+SN
+1
+Density of the grout material
+simple
+real
+3
++
+0
++Inf
+] ; [
+1590
+0
+kg/m^3
+Density
+cp filling
+SN
+1
+Specific heat capacity of the grout material
+simple
+real
+3
++
+0
++Inf
+] ; [
+1.96
+0
+kJ/kg.K
+Specific Heat
+Number of segments
+SN
+1
+Number of segments for vertical discretisation of one borehole
+simple
+integer
+3
++
+2
++Inf
+[ ; ]
+27
+0
+-
+Dimensionless
+TC fluid
+SN
+1
+Thermal conductivity of the heat transfer medium
+simple
+real
+3
++
+0
++Inf
+] ; [
+1.8
+0
+kJ/hr.m.K
+Thermal Conductivity
+Density fluid
+SN
+1
+Density of the heat transfer medium
+simple
+real
+3
++
+0
++Inf
+] ; [
+1035
+0
+kg/m^3
+Density
+cp fluid
+SN
+1
+Specific heat capacity of the heat transfer medium
+simple
+real
+3
++
+0
++Inf
+] ; [
+3.8
+0
+kJ/kg.K
+Specific Heat
+mu fluid
+SN
+1
+Dynamic viscosity of the fluid
+simple
+real
+3
++
+0
++Inf
+] ; [
+4.7016
+0
+kg/m.hr
+Dynamic Viscosity
+Undisturbed ground temperature
+SN
+1
+Undisturbed ground temperature at the top of the weather independent depth. If combined with a geothermal gradient this should correspond to the mean annual air temperature at the location. If the mean undisturbed ground temperature is known it can be used instead with a geothermal gradient of zero if applicable.
+simple
+real
+3
++
+-273.15
+6000
+[ ; ]
+12.1
+0
+C
+Temperature
+Outlet temperature
+SN
+1
+
+simple
+real
+2
++
+-273.15
+6000
+[ ; ]
+12
+0
+C
+Temperature
+Outlet mass flow rate (total)
+SN
+1
+Total outlet mass flow rate (should be the same as total inlet mass flow rate)
+simple
+real
+2
++
+0
++Inf
+[ ; ]
+0
+0
+kg/hr
+Flow Rate
+Average wall temperature
+SN
+1
+Average borehole wall temperature
+simple
+real
+2
++
+-273.15
+6000
+[ ; ]
+12
+0
+C
+Temperature
+Average heat transfer rate
+SN
+1
+The rate at which heat is transferred to the ground from the fluid.
+simple
+real
+2
++
+-Inf
++Inf
+[ ; ]
+0
+0
+kJ/hr
+Power
+Number of sheath grout nodes
+SN
+1
+Number of sheath grout nodes
+simple
+integer
+3
++
+2
++Inf
+[ ; ]
+3
+0
+-
+Dimensionless
+read g-function from file
+SN
+1
+<=0: calculate g-function, >0: read g-function from file
+simple
+integer
+3
++
+-Inf
++Inf
+[ ; ]
+0
+0
+-
+Dimensionless
+0
+0
+0
+0
+0
+
+*** trnModel specific properties ***
+1
+299
+
+9
+
+
+
+0
+
+
+
+0
+
+
+
+0
+
+
+
+0
+
+
+
+0
+
+
+
+0
+
+
+
+0
+
+
+
+0
+
+
+
+0
+9
+
+
+
+0
+
+
+0
+
+
+
+0
+
+
+0
+
+
+
+0
+
+
+0
+
+
+
+0
+
+
+0
+
+
+
+0
+
+
+0
+
+
+
+0
+
+
+0
+
+
+
+0
+
+
+0
+
+
+
+0
+
+
+0
+
+
+
+0
+
+
+0
+2
+Geothermal
+Heat Exchanger
+0
+1
+0
+
+
+1
+100
+0
+3
+0
+
+
+1
+100
+0
+20
+0
+
+
+1
+100
+-1
+-1
+0
+
+
+1
+100
