@@ -10,17 +10,19 @@ const double pi = std::numbers::pi;
 
 namespace t299
 {
-    void message(int crntUnit, int crntType, const char errorType[], const char message[])
+    void message(const char errorType[], const char message[])
     { // Pass string message to Trnsys
+        int currentUnit = getCurrentUnit(); // TODO nicht jedes mal aufrufen?
+        int currentType = getCurrentType();
         int errorCode = -1;
         char type[20];
         char message4Trnsys[400];
         strcpy_s(type,errorType);
         strcpy_s(message4Trnsys,message);
-        messages(&errorCode, message4Trnsys, type, &crntUnit, &crntType, (size_t)strlen(message4Trnsys), (size_t)strlen(type));
+        messages(&errorCode, message4Trnsys, type, &currentUnit, &currentType, (size_t)strlen(message4Trnsys), (size_t)strlen(type));
     }
 
-    double calcNusseltNo(double re, double pr, int crntUnit, int crntType)
+    double calcNusseltNo(double re, double pr)
     { // Calculate the Nusselt number
         double nu;
         if((3000 <= re) && (re <= pow(10,6))) // Taler & Taler 2017
@@ -40,7 +42,7 @@ namespace t299
             else
             {
                 nu = 0.00881*pow(re,0.8991)*pow(pr,0.3911);
-                t299::message(crntUnit, crntType, "Warning", "Prandtl number is outside the acceptable range.");
+                t299::message("Warning", "Prandtl number is outside the acceptable range.");
             }
         }
         else if (re < 3000.) // TODO decide on 2300 (laminar, Laferrière) or 3000 (turbulent, Taler²) - used also for stagnation
@@ -50,7 +52,7 @@ namespace t299
         else
         {
             nu = 0.00881*pow(re,0.8991)*pow(pr,0.3911);
-            t299::message(crntUnit, crntType, "Warning", "Reynolds number is outside the acceptable range.");
+            t299::message("Warning", "Reynolds number is outside the acceptable range.");
         }
         
         return nu;

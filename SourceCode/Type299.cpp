@@ -5,6 +5,7 @@
 #include <numbers>
 #include <numeric>
 #include <gsl/gsl_interp.h>
+#include <gsl/gsl_errno.h>
 #include <chrono>
 
 #include "Type299_functions.h"
@@ -73,8 +74,6 @@ const double pi = std::numbers::pi;
 
 	static double timestep{0.}; // simulation time step size (s)
 	static double timeSpan{0.}; // t_simEnd - t_simStart (s)
-	static int currentUnit{0}; // current Trnsys unit
-	static int currentType{299}; // current Trnsys type
 
 	static double ri_tube{0.}; // inner radius of one pipe
 	static double area_tube{0.}; // area of the inner cross section of one pipe
@@ -134,8 +133,6 @@ void readParameters()
 	double t_simEnd = getSimulationStopTime()*3600; // s
 	double t_simStart = getSimulationStartTime()*3600; // s
 	timeSpan = t_simEnd - t_simStart;
-	currentUnit = getCurrentUnit();
-	//currentType = getCurrentType();
 	// other time independent parameters
 	ri_tube = r_tube - d_tube;
 	area_tube = pi*pow(ri_tube,2);
@@ -166,10 +163,11 @@ void readParameters()
 	storageWithinTimestep.resize(nStore,temp_init);
 	// read external file containing borehole coordinates
 	std::string fileNameCoord = "./coordinates.txt"; // Must currently be placed in the project folder
+		
 	std::ifstream file(fileNameCoord);
 	if (!file.is_open())
 	{
-		t299::message(currentUnit,currentType,"fatal","file containing the borehole coordinates couldn't be opened."
+		t299::message("fatal","file containing the borehole coordinates couldn't be opened."
 		" Please place 'coordinates.txt' in the same folder as the .dck file.");
 	}
 	double xValue, yValue;
@@ -204,11 +202,11 @@ void readParameters()
 	if(read_gFuncFromFile>0)
 	{
 		// read external file containing borehole coordinates
-		std::string fileNameGfunc = "./pygfunction_gFunc.txt"; // TEST
+		std::string fileNameGfunc = "./pygfunction_gFunc.txt";
 		std::ifstream file2(fileNameGfunc);
 		if(!file2.is_open())
 		{
-			t299::message(currentUnit,currentType,"fatal","file containing the g-function couldn't be opened."
+			t299::message("fatal","file containing the g-function couldn't be opened."
 			" Please place 'pygfunction_gFunc.txt' in the same folder as the .dck file.");
 		}
 		std::string line;
@@ -250,7 +248,6 @@ extern "C" __declspec(dllexport) void TYPE299(void)
 
 	//Get the Global Trnsys Simulation Variables
 	double time = getSimulationTime();
-	//int nTimeSteps = getnTimeSteps();
 
 	//Set the Version Number for This Type
 	if (getIsVersionSigningTime())
@@ -282,6 +279,9 @@ extern "C" __declspec(dllexport) void TYPE299(void)
 	//Do All of the "Very First Call of the Simulation Manipulations" Here
 	if (getIsFirstCallofSimulation())
 	{
+		// Turn off gsl default error handler that would kill the entire application on error 
+		gsl_set_error_handler_off();
+
 		//Tell the TRNSYS Engine How This Type Works
 		int npar = 21;
 		int nin = 2;
@@ -359,7 +359,7 @@ extern "C" __declspec(dllexport) void TYPE299(void)
 	if(temp_in > 200+273.15)
 	{
 		index = 1;
-		strcpy_s(type, "Error");
+		strcpy_s(type, "Fatal");
 		strcpy_s(message, "BHE inlet temperature is above 200 degC. Please don't cook the ground.");
 		foundBadInput(&index, type, message, (size_t)strlen(type), (size_t)strlen(message));
 	}
@@ -380,7 +380,7 @@ extern "C" __declspec(dllexport) void TYPE299(void)
 		#ifdef LOG_PERFORMANCE
 		auto endTime = std::chrono::steady_clock::now();
 		auto timeDiff = std::chrono::duration<double,std::milli>(endTime - currentTime).count();
-		t299::message(currentUnit,currentType,"notice",("time for " + timeBlockName +": " + std::to_string(timeDiff) + " ms").c_str());
+		t299::message("notice",("time for " + timeBlockName +": " + std::to_string(timeDiff) + " ms").c_str());
 		currentTime = std::chrono::steady_clock::now();
 		#endif
 	};
@@ -391,14 +391,13 @@ extern "C" __declspec(dllexport) void TYPE299(void)
 	double v_HTM = mflow_in/n_BHE/n_Utubes/rho_HTM/area_tube; // fluid velocity (m/s)
 	double re = v_HTM*2*r_tube/nu_HTM; // Reynolds number (-)
 	double pr = nu_HTM/a_HTM; // Prandtl number (-)
-	double nu = t299::calcNusseltNo(re,pr,currentUnit,currentType); // Nusselt number (-)
+	double nu = t299::calcNusseltNo(re,pr); // Nusselt number (-)
 	// Calculate resistances varying with time
 	double res_f = 1/(pi*nu*lambda_HTM); // convective fluid resistance in m*K/W
 	double res_fp = res_f + res_p; // combined convective and conductive fluid/pipe resistance
 
 	logTime("flow resistance");
 
-	// ---------- DAS HIER SOLLTE theoretisch evtl. NUR AM ANFANG AUSGEWERTET WERDEN! ----------
 	auto [res_g,res_gg1,res_gg2] = t299::calcGroutResistances(res_fp, lambda_grout, lambda_ground, r_BHE, r_tube, d_shanks, n_pipes); // borehole resistance Rb and inner borehole resistance Ra (m*K/W)
 	res_gj = res_g/n_g;
 	// Calculate heat capacities
@@ -428,13 +427,13 @@ extern "C" __declspec(dllexport) void TYPE299(void)
 		double capTot = (std::reduce(cap_g.begin(), cap_g.end(),0.) + cap_gWall)*n_pipes;
 		double capTotCalc = pi*(pow(r_BHE,2)-n_pipes*pow(r_tube,2))*rho_grout*c_grout;
 		if(std::abs(capTot - capTotCalc) > 1.e-6)
-			t299::message(currentUnit,currentType,"fatal","Sum of thermal sub-capacities differs from total thermal capacity!");
+			t299::message("fatal","Sum of thermal sub-capacities differs from total thermal capacity!");
 		double volTot = (std::reduce(vol_g.begin(), vol_g.end(),0.)*n_pipes + vol_ggTot);
 		double volTotCalc = pi*(pow(r_BHE,2)-n_pipes*pow(r_tube,2));
 		if(std::abs(volTot - volTotCalc) > 1.e-6)
-			t299::message(currentUnit,currentType,"fatal","Sum of sub-volumes differs from total volume!");
+			t299::message("fatal","Sum of sub-volumes differs from total volume!");
 		if(std::abs(r_g[n_g] - r_BHE) > 1.e-6)
-			t299::message(currentUnit,currentType,"fatal","Outer sub-radius does not correspond to borehole radius!");
+			t299::message("fatal","Outer sub-radius does not correspond to borehole radius!");
 	}
 	
 	currentTime = std::chrono::steady_clock::now();
@@ -574,18 +573,18 @@ extern "C" __declspec(dllexport) void TYPE299(void)
 
 	// ------------------------ OUTPUTS ------------------------
 	if(temp_out<=0)
-		t299::message(currentUnit,currentType,"Fatal","BHE outlet temperature reached absolute zero.");
+		t299::message("Fatal","BHE outlet temperature reached absolute zero.");
 	else if (temp_out>5000)
 	{
-		t299::message(currentUnit,currentType,"Fatal","BHE outlet temperature is too high - "
+		t299::message("Fatal","BHE outlet temperature is too high - "
 		"unless your location is the sun.");
 	}
 	
 	if(temp_wall<=0)
-		t299::message(currentUnit,currentType,"Fatal","BHE wall temperature reached absolute zero.");
+		t299::message("Fatal","BHE wall temperature reached absolute zero.");
 	else if (temp_wall>5000)
 	{
-		t299::message(currentUnit,currentType,"Fatal","BHE wall temperature is too high - "
+		t299::message("Fatal","BHE wall temperature is too high - "
 		"unless your location is the sun.");
 	}
 

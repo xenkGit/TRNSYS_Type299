@@ -11,6 +11,9 @@
 #include <iostream>
 #include <fstream>
 
+#include "Type299_functions.h"
+#include <sstream>
+
 const double pi = std::numbers::pi;
 
 // collection of functions for g-function calculation based on Düber 2022
@@ -28,12 +31,17 @@ namespace gFunc
 
     double g_ILS(double r, double lambda_ground, double a_ground, double t)
     {
-        // Compute the argument for gsl_sf_expint_E1
         double argument = r * r / (4.0 * a_ground * t);
-        if (argument > 100) // At the beginning ICS is more important
-            return (1.0 / (4.0 * pi * lambda_ground)) * (exp(-argument) / argument);
-        else
-            return (1.0 / (4.0 * pi * lambda_ground)) * gsl_sf_expint_E1(argument);
+        gsl_sf_result result;
+        int status = gsl_sf_expint_E1_e(argument, &result);
+        if((status != 0) & (status != 15)) // 15: result so small that rounded to zero
+        {
+            std::stringstream sstream;
+            sstream << "ILS integration failed with code " << status << " at time " << t;
+            t299::message("warning",sstream.str().c_str());  
+            return 0.;
+        }
+        return (1.0 / (4.0 * pi * lambda_ground)) * result.val;
     }
 
     // Struct for integration parameters
@@ -64,6 +72,20 @@ namespace gFunc
         F.params = &params;
         double result = 0., error = 0.;
         int status = gsl_integration_qagiu(&F, s, 1.e-15, 1.e-7, w->limit, w, &result, &error);
+        
+        double exponent = -params.r * params.r * s * s;
+        double ils_value = ils(l_BHE * s, 1 * s); // D=1
+        double denominator = l_BHE * s * s;
+        double tmp_result = std::exp(exponent) * ils_value / denominator;
+        
+        if(status != 0)
+        {
+            std::stringstream sstream;
+            sstream << "FLS integration failed with code " << status << 
+            ", for distance " << r << " m at time " << t;
+            t299::message("warning",sstream.str().c_str());            
+            return 0.0;
+        }
         return (1. / (4. * pi * lambda_ground)) * result;
     }
 
@@ -81,10 +103,16 @@ namespace gFunc
         double r = params->r, r_BHE = params->r_BHE, a_ground = params->a_ground, t = params->t;
         double cos_theta = std::cos(theta);
         double argument = (r * r + r_BHE * r_BHE - 2.0 * r * r_BHE * cos_theta) / (4.0 * a_ground * t);
-        if (argument > 100) // TODO: betrifft ca. die ersten 2 Monate
-            return (1./pi) * (exp(-argument) / argument); // TODO!!!
-        else
-            return (1./pi) * gsl_sf_expint_E1(argument); //underflow error
+        gsl_sf_result result;
+        int status = gsl_sf_expint_E1_e(argument, &result);
+        if((status != 0) & (status != 15)) // 15: result so small that rounded to zero
+        {
+            std::stringstream sstream;
+            sstream << "ICS integration failed with code " << status << " at time " << t;
+            t299::message("warning",sstream.str().c_str());  
+            return 0.;
+        }
+        return (1./pi) * result.val;
     }
 
     double g_ICS(double r, double r_BHE, double lambda_ground, double a_ground, double t, gsl_integration_workspace* w)
@@ -94,7 +122,14 @@ namespace gFunc
         F.function = &ics_integrand;
         F.params = &params;
         double result = 0.0, error = 0.0;
-        gsl_integration_qags(&F, 0., pi, 1.e-15, 1.e-7, w->limit, w, &result, &error); 
+        int status = gsl_integration_qags(&F, 0., pi, 1.e-15, 1.e-7, w->limit, w, &result, &error); 
+        if(status != 0)
+        {
+            std::stringstream sstream;
+            sstream << "ICS integration failed with code " << status;
+            t299::message("warning",sstream.str().c_str());            
+            return 0.0;
+        }
         return (1.0 / (4.0 * pi * lambda_ground)) * result;
     }
 
@@ -104,7 +139,7 @@ namespace gFunc
         double gICS = g_ICS(r, r_BHE, lambda_ground, a_ground, t, w);
         double gFLS = g_FLSjc(r, l_BHE, lambda_ground, a_ground, t, w);
         double gILS = g_ILS(r, lambda_ground, a_ground, t);
-        if (gfsfile.is_open()) // Test: löschen oder als Info lassen?
+        if (gfsfile.is_open())
         {
             gfsfile << t << "\t" << gICS << "\t" << gFLS << "\t" << gILS << "\n";
         }
@@ -134,10 +169,10 @@ namespace gFunc
         gsl_integration_workspace* w = gsl_integration_workspace_alloc(1000);
         if (!w)
         {
-            //logError("Failed to allocate GSL workspace");
-            return {};
-        }       
-        std::ofstream gfsfile("gfunctions.txt"); // Test: löschen oder als Info lassen?
+            t299::message("fatal","Failed to allocate GSL workspace");
+        }
+        // write g-functions to files (for reference only)
+        std::ofstream gfsfile("gfunctions.txt");
         gfsfile << "Time_s" << "\t" << "gICS" << "\t" << "gFLS" << "\t" << "gILS" << "\n";
         std::ofstream gffile("gfunction.txt");
         gffile << "Time_s" << "\t" << "gFunction" << "\n";
@@ -148,7 +183,9 @@ namespace gFunc
             for(size_t i = 0; i < nBHE; ++i)
             {
                 for(size_t j = 0; j < nBHE; ++j)
+                {
                     g_sum += g_FullScale(gMatrixTemp(i, j), r_BHE, l_BHE, lambda_ground, a_ground, time(t), w, gfsfile);
+                }
             }
             gFunction[t] = g_sum / nBHE; // Compute the average g-function
             gffile << time(t) << "\t" << gFunction[t] << "\n";
